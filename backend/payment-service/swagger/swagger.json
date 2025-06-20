@@ -1,0 +1,133 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Payment Service API",
+    "description": "API for managing payments in Concert Ticket Booking System",
+    "version": "1.0"
+  },
+  "host": "localhost:8083",
+  "basePath": "/api",
+  "schemes": ["http"],
+  "paths": {
+    "/payments": {
+      "post": {
+        "summary": "Create a new payment",
+        "description": "Create a new payment for a booking",
+        "tags": ["Payments"],
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "payment",
+            "description": "Payment data",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/PaymentCreateRequest"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Payment created",
+            "schema": {
+              "$ref": "#/definitions/Payment"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {"type": "string"}
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/payments/{id}": {
+      "get": {
+        "summary": "Get payment by ID",
+        "description": "Retrieve payment details by ID",
+        "tags": ["Payments"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "type": "integer",
+            "required": true,
+            "description": "Payment ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment found",
+            "schema": {
+              "$ref": "#/definitions/Payment"
+            }
+          },
+          "400": {
+            "description": "Invalid payment ID",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {"type": "string"}
+              }
+            }
+          },
+          "404": {
+            "description": "Payment not found",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {"type": "string"}
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "Payment": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "integer"},
+        "booking_id": {"type": "integer"},
+        "amount": {"type": "number"},
+        "status": {"type": "string"},
+        "payment_method": {"type": "string"},
+        "created_at": {"type": "string", "format": "date-time"},
+        "updated_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "PaymentCreateRequest": {
+      "type": "object",
+      "properties": {
+        "booking_id": {"type": "integer"},
+        "amount": {"type": "number"},
+        "payment_method": {"type": "string"}
+      }
+    }
+  }
+}

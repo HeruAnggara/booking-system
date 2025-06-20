@@ -1,0 +1,133 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Booking Service API",
+    "description": "API for managing bookings in Concert Ticket Booking System",
+    "version": "1.0"
+  },
+  "host": "localhost:8082",
+  "basePath": "/api",
+  "schemes": ["http"],
+  "paths": {
+    "/bookings": {
+      "post": {
+        "summary": "Create a new booking",
+        "description": "Create a new booking for a concert",
+        "tags": ["Bookings"],
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "booking",
+            "description": "Booking data",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/BookingCreateRequest"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Booking created",
+            "schema": {
+              "$ref": "#/definitions/Booking"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {"type": "string"}
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bookings/{id}": {
+      "get": {
+        "summary": "Get booking by ID",
+        "description": "Retrieve booking details by ID",
+        "tags": ["Bookings"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "type": "integer",
+            "required": true,
+            "description": "Booking ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Booking found",
+            "schema": {
+              "$ref": "#/definitions/Booking"
+            }
+          },
+          "400": {
+            "description": "Invalid booking ID",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {"type": "string"}
+              }
+            }
+          },
+          "404": {
+            "description": "Booking not found",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {"type": "string"}
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "Booking": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "integer"},
+        "user_id": {"type": "integer"},
+        "concert_id": {"type": "integer"},
+        "seats": {"type": "integer"},
+        "status": {"type": "string"},
+        "created_at": {"type": "string", "format": "date-time"},
+        "updated_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "BookingCreateRequest": {
+      "type": "object",
+      "properties": {
+        "user_id": {"type": "integer"},
+        "concert_id": {"type": "integer"},
+        "seats": {"type": "integer"}
+      }
+    }
+  }
+}
