@@ -13,7 +13,7 @@ const PaymentContext = createContext<PaymentContextType | undefined>(undefined);
 
 export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const { currentBooking, clearBooking } = useBooking();
+  const { currentBooking, clearBooking, getTotalAmount } = useBooking();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,18 +25,17 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No authentication token found');
 
+      // Use the first booking's ID or assume a single booking_id is provided
+      if (currentBooking.length === 0) throw new Error('No bookings in cart');
+      const bookingId = currentBooking[0].id || 1; // Adjust based on your BookingContext structure
+
       const paymentData = {
-        userId: user?.id,
-        customerInfo,
-        bookings: currentBooking.map(item => ({
-          concertId: item.concertId,
-          ticketTypeId: item.ticketTypeId,
-          quantity: item.quantity,
-          price: item.price,
-        })),
-        totalAmount: currentBooking.reduce((sum, item) => sum + item.price * item.quantity, 0),
+        user_id: user?.id || 1, // Match backend's user_id
+        booking_id: bookingId,
+        amount: getTotalAmount(), // Use total amount from BookingContext
       };
 
+      console.log('Sending payment request:', paymentData); // Debug
       const response = await fetch('http://localhost:8083/api/payments', {
         method: 'POST',
         headers: {
@@ -48,11 +47,11 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Payment failed');
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      if (data.status == 201) {
+      if (data.status === 201) { // Match backend response status
         clearBooking();
         toast({
           title: "Payment successful!",
@@ -63,6 +62,7 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
         throw new Error(data.message || 'Payment processing failed');
       }
     } catch (err) {
+      console.error('Payment error:', err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
       toast({
         title: "Payment failed",
