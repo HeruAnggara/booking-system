@@ -160,14 +160,17 @@ func (c *BookingController) DeleteBooking(ctx *fiber.Ctx) error {
 	}
 
 	// Extract userID from JWT (example, implement actual JWT parsing)
-	userID := 1 // Replace with actual user ID from token
+	userID, ok := ctx.Locals("user_id").(int)
+	if !ok {
+		return ctx.Status(http.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid token"})
+	}
 
 	err = c.service.DeleteBooking(context.Background(), id, userID)
 	if err != nil {
 		return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return ctx.SendStatus(http.StatusNoContent)
+	return ctx.Status(http.StatusOK).JSON(fiber.Map{"status": 200, "message": "Booking deleted successfully"})
 }
 
 // GetPendingBookings menangani GET /api/bookings/pending

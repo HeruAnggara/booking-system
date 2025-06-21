@@ -72,6 +72,15 @@ func (s *BookingService) CreateBooking(ctx context.Context, req *models.BookingC
 		log.Printf("Failed to cache booking %d: %v", bookingID, err)
 	}
 
+	cachePendingKey := fmt.Sprintf("pending_bookings:%d", req.UserID)
+	if err := s.cfg.Redis.Del(ctx, cachePendingKey).Err(); err != nil {
+		log.Printf("Failed to delete cache for pending bookings of user %d: %v", req.UserID, err)
+	}
+	// Cache pending bookings di Redis
+	if err := s.cfg.Redis.LPush(ctx, cachePendingKey, bookingJSON).Err(); err != nil {
+		log.Printf("Failed to cache pending booking %d: %v", bookingID, err)
+	}
+
 	return booking, nil
 }
 
@@ -152,6 +161,12 @@ func (s *BookingService) DeleteBooking(ctx context.Context, id int, userID int) 
 		log.Printf("Failed to delete cache for booking %d: %v", id, err)
 	}
 
+	// Hapus cache pending
+	cachePendingKey := fmt.Sprintf("pending_bookings:%d", userID)
+	if err := s.cfg.Redis.Del(ctx, cachePendingKey).Err(); err != nil {
+		log.Printf("Failed to delete cache for pending bookings of user %d: %v", userID, err)
+	}
+
 	return nil
 }
 
@@ -205,7 +220,7 @@ func (s *BookingService) GetPendingBookings(ctx context.Context, userID int) ([]
 // CompleteBooking mengubah status booking menjadi "completed" setelah pembayaran berhasil
 func (s *BookingService) CompleteBooking(ctx context.Context, id int, userID int) error {
 	// Cek cache Redis
-	cacheKey := fmt.Sprintf("booking:%d", id)
+	cacheKey := fmt.Sprintf("pending_bookings:%d", userID)
 	cached, err := s.cfg.Redis.Get(ctx, cacheKey).Result()
 	if err == nil {
 		var booking models.Booking
@@ -252,7 +267,14 @@ func (s *BookingService) CompleteBooking(ctx context.Context, id int, userID int
 	// Update cache
 	booking.Status = "completed"
 	bookingJSON, _ := json.Marshal(booking)
-	if err := s.cfg.Redis.Set(ctx, cacheKey, bookingJSON, 10*time.Minute).Err(); err != nil {
+
+	// Hapus cache pending
+	if err := s.cfg.Redis.Del(ctx, cacheKey).Err(); err != nil {
+		log.Printf("Failed to delete cache for pending bookings of user %d: %v", userID, err)
+	}
+
+	bookingCacheKey := fmt.Sprintf("booking:%d", id)
+	if err := s.cfg.Redis.Set(ctx, bookingCacheKey, bookingJSON, 10*time.Minute).Err(); err != nil {
 		log.Printf("Failed to cache updated booking %d: %v", id, err)
 	}
 
