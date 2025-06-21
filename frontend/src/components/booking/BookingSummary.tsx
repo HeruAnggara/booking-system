@@ -9,24 +9,28 @@ import { Separator } from '@/components/ui/separator';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Trash2, CreditCard, CheckCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { mockConcerts } from '@/data/mockData';
+import { useNavigate } from 'react-router-dom';
+import { useConcert } from '@/contexts/ConcertContext';
+import { usePayment } from '@/contexts/PaymentContext'; // Import PaymentContext
 
 export const BookingSummary: React.FC = () => {
-  const { currentBooking, removeFromBooking, clearBooking, getTotalAmount } = useBooking();
+  const navigate = useNavigate();
+  const { currentBooking, removeFromBooking, getTotalAmount } = useBooking();
   const { user } = useAuth();
+  const { getConcertById } = useConcert();
+  const { processPayment, loading: paymentLoading, error: paymentError } = usePayment(); // Use PaymentContext
   const [customerInfo, setCustomerInfo] = useState({
     name: user?.name || '',
     email: user?.email || '',
     phone: '',
   });
-  const [isProcessing, setIsProcessing] = useState(false);
   const [bookingComplete, setBookingComplete] = useState(false);
 
   const handleInputChange = (field: string, value: string) => {
     setCustomerInfo(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleRemoveItem = (concertId: string, ticketTypeId: string) => {
+  const handleRemoveItem = (concertId: number, ticketTypeId: number) => {
     removeFromBooking(concertId, ticketTypeId);
     toast({
       title: "Removed from cart",
@@ -44,27 +48,9 @@ export const BookingSummary: React.FC = () => {
       return;
     }
 
-    setIsProcessing(true);
-    
-    try {
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
+    const success = await processPayment(customerInfo);
+    if (success) {
       setBookingComplete(true);
-      clearBooking();
-      
-      toast({
-        title: "Payment successful!",
-        description: "Your tickets have been booked successfully.",
-      });
-    } catch (error) {
-      toast({
-        title: "Payment failed",
-        description: "There was an error processing your payment. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsProcessing(false);
     }
   };
 
@@ -99,6 +85,9 @@ export const BookingSummary: React.FC = () => {
             <p className="text-gray-600">
               Browse concerts and add tickets to your cart to get started.
             </p>
+            <Button onClick={() => navigate('/')} className="w-full">
+              Back to Concert List
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -116,7 +105,7 @@ export const BookingSummary: React.FC = () => {
         {/* Cart Items */}
         <div className="space-y-4">
           {currentBooking.map((item) => {
-            const concert = mockConcerts.find(c => c.id === item.concertId);
+            const concert = getConcertById(item.concertId.toString());
             const ticketType = concert?.ticketTypes.find(t => t.id === item.ticketTypeId);
             
             if (!concert || !ticketType) return null;
@@ -127,7 +116,7 @@ export const BookingSummary: React.FC = () => {
                   <h4 className="font-semibold">{concert.title}</h4>
                   <p className="text-sm text-gray-600">{ticketType.name}</p>
                   <p className="text-sm text-gray-500">
-                    Quantity: {item.quantity} × ${item.price}
+                    Quantity: {item.quantity} × ${item.price.toFixed(2)}
                   </p>
                 </div>
                 <div className="flex items-center space-x-3">
@@ -135,7 +124,7 @@ export const BookingSummary: React.FC = () => {
                     ${(item.price * item.quantity).toFixed(2)}
                   </span>
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     onClick={() => handleRemoveItem(item.concertId, item.ticketTypeId)}
                     className="text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -199,11 +188,11 @@ export const BookingSummary: React.FC = () => {
         {/* Payment Button */}
         <Button
           onClick={handleProcessPayment}
-          disabled={isProcessing}
+          disabled={paymentLoading}
           className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
           size="lg"
         >
-          {isProcessing ? (
+          {paymentLoading ? (
             <>
               <LoadingSpinner size="sm" className="mr-2" />
               Processing Payment...
@@ -215,6 +204,7 @@ export const BookingSummary: React.FC = () => {
             </>
           )}
         </Button>
+        {paymentError && <p className="text-red-600 text-sm mt-2">{paymentError}</p>}
       </CardContent>
     </Card>
   );

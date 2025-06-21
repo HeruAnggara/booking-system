@@ -1,0 +1,94 @@
+version: '3.8'
+services:
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=root
+      - DB_NAME=ticket_booking
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=TdWmsFw7i9KGDi8r79uyz3hXsJwxU6Sm
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - ticket-network
+    restart: unless-stopped
+
+  booking-service:
+    build:
+      context: ./booking-service
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=root
+      - DB_NAME=ticket_booking
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=TdWmsFw7i9KGDi8r79uyz3hXsJwxU6Sm
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - ticket-network
+    restart: unless-stopped
+
+  payment-service:
+    build:
+      context: ./payment-service
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8083"
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=root
+      - DB_NAME=ticket_booking
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=TdWmsFw7i9KGDi8r79uyz3hXsJwxU6Sm
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - ticket-network
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=ticket_booking
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    ports:
+      - "3306:3306"
+    networks:
+      - ticket-network
+
+  redis:
+    image: redis:7.0
+    ports:
+      - "6379:6379"
+    networks:
+      - ticket-network
+
+volumes:
+  mysql-data:
+
+networks:
+  ticket-network:
+    driver: bridge

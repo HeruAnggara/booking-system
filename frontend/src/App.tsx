@@ -8,6 +8,8 @@ import { ConcertDetailPage } from '@/pages/ConcertDetailPage';
 import { BookingPage } from '@/pages/BookingPage';
 import { Toaster } from '@/components/ui/sonner';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { ConcertProvider } from './contexts/ConcertContext';
+import { PaymentProvider } from './contexts/PaymentContext';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isLoading } = useAuth();
@@ -80,12 +82,16 @@ function App() {
   return (
     <AuthProvider>
       <BookingProvider>
-        <Router>
-          <div className="min-h-screen bg-gray-50">
-            <AppRoutes />
-            <Toaster />
-          </div>
-        </Router>
+        <ConcertProvider>
+          <PaymentProvider>
+            <Router>
+              <div className="min-h-screen bg-gray-50">
+                <AppRoutes />
+                <Toaster />
+              </div>
+            </Router>
+          </PaymentProvider>
+        </ConcertProvider>
       </BookingProvider>
     </AuthProvider>
   );

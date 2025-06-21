@@ -8,6 +8,14 @@
   "host": "localhost:8082",
   "basePath": "/api",
   "schemes": ["http"],
+  "securityDefinitions": {
+    "BearerAuth": {
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header",
+      "description": "Enter token in format: Bearer <token>"
+    }
+  },
   "paths": {
     "/bookings": {
       "post": {
@@ -16,6 +24,11 @@
         "tags": ["Bookings"],
         "consumes": ["application/json"],
         "produces": ["application/json"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "in": "body",
@@ -43,6 +56,15 @@
               }
             }
           },
+          "401": {
+            "description": "Unauthorized",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {"type": "string"}
+              }
+            }
+          },
           "500": {
             "description": "Internal server error",
             "schema": {
@@ -61,6 +83,11 @@
         "description": "Retrieve booking details by ID",
         "tags": ["Bookings"],
         "produces": ["application/json"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "in": "path",
@@ -79,6 +106,15 @@
           },
           "400": {
             "description": "Invalid booking ID",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {"type": "string"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
             "schema": {
               "type": "object",
               "properties": {
@@ -115,8 +151,9 @@
         "id": {"type": "integer"},
         "user_id": {"type": "integer"},
         "concert_id": {"type": "integer"},
-        "seats": {"type": "integer"},
-        "status": {"type": "string"},
+        "ticket_count": {"type": "integer"},
+        "total_price": {"type": "number"},
+        "status": {"type": "string", "enum": ["pending", "confirmed", "cancelled"]},
         "created_at": {"type": "string", "format": "date-time"},
         "updated_at": {"type": "string", "format": "date-time"}
       }
@@ -124,9 +161,9 @@
     "BookingCreateRequest": {
       "type": "object",
       "properties": {
-        "user_id": {"type": "integer"},
         "concert_id": {"type": "integer"},
-        "seats": {"type": "integer"}
+        "ticket_count": {"type": "integer"},
+        "total_price": {"type": "number"}
       }
     }
   }

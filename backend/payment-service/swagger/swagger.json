@@ -8,6 +8,14 @@
   "host": "localhost:8083",
   "basePath": "/api",
   "schemes": ["http"],
+  "securityDefinitions": {
+    "BearerAuth": {
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header",
+      "description": "Enter token in format: Bearer <token>"
+    }
+  },
   "paths": {
     "/payments": {
       "post": {
@@ -16,6 +24,11 @@
         "tags": ["Payments"],
         "consumes": ["application/json"],
         "produces": ["application/json"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "in": "body",
@@ -43,6 +56,15 @@
               }
             }
           },
+          "401": {
+            "description": "Unauthorized",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {"type": "string"}
+              }
+            }
+          },
           "500": {
             "description": "Internal server error",
             "schema": {
@@ -61,6 +83,11 @@
         "description": "Retrieve payment details by ID",
         "tags": ["Payments"],
         "produces": ["application/json"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "in": "path",
@@ -79,6 +106,15 @@
           },
           "400": {
             "description": "Invalid payment ID",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {"type": "string"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
             "schema": {
               "type": "object",
               "properties": {
@@ -113,10 +149,10 @@
       "type": "object",
       "properties": {
         "id": {"type": "integer"},
+        "user_id": {"type": "integer"},
         "booking_id": {"type": "integer"},
         "amount": {"type": "number"},
         "status": {"type": "string"},
-        "payment_method": {"type": "string"},
         "created_at": {"type": "string", "format": "date-time"},
         "updated_at": {"type": "string", "format": "date-time"}
       }
@@ -125,8 +161,7 @@
       "type": "object",
       "properties": {
         "booking_id": {"type": "integer"},
-        "amount": {"type": "number"},
-        "payment_method": {"type": "string"}
+        "amount": {"type": "number"}
       }
     }
   }

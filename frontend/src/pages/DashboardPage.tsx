@@ -1,40 +1,26 @@
-import React, { useState, useMemo } from 'react';
+import React from 'react';
 import { Header } from '@/components/layout/Header';
 import { ConcertCard } from '@/components/concerts/ConcertCard';
 import { ConcertFilters } from '@/components/concerts/ConcertFilters';
-import { mockConcerts } from '@/data/mockData';
-import { Concert } from '@/types';
+import { ConcertProvider, useConcert } from '@/contexts/ConcertContext';
 
-export const DashboardPage: React.FC = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [cityFilter, setCityFilter] = useState('all');
-
-  const availableCities = useMemo(() => {
-    return Array.from(new Set(mockConcerts.map(concert => concert.city))).sort();
-  }, []);
-
-  const filteredConcerts = useMemo(() => {
-    return mockConcerts.filter((concert) => {
-      const matchesSearch = 
-        concert.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        concert.artist.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        concert.venue.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesStatus = statusFilter === 'all' || concert.status === statusFilter;
-      const matchesCity = cityFilter === 'all' || concert.city === cityFilter;
-      
-      return matchesSearch && matchesStatus && matchesCity;
-    });
-  }, [searchTerm, statusFilter, cityFilter]);
+const DashboardContent: React.FC = () => {
+  const {
+    concerts,
+    availableCities,
+    loading,
+    citiesLoading,
+    error,
+    searchTerm,
+    statusFilter,
+    cityFilter,
+    setSearchTerm,
+    setStatusFilter,
+    setCityFilter,
+    clearFilters,
+  } = useConcert();
 
   const hasActiveFilters = searchTerm !== '' || statusFilter !== 'all' || cityFilter !== 'all';
-
-  const clearFilters = () => {
-    setSearchTerm('');
-    setStatusFilter('all');
-    setCityFilter('all');
-  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -64,6 +50,9 @@ export const DashboardPage: React.FC = () => {
             onClearFilters={clearFilters}
             hasActiveFilters={hasActiveFilters}
           />
+          {citiesLoading && (
+            <p className="text-gray-600 text-sm mt-2">Loading cities...</p>
+          )}
         </div>
 
         {/* Results */}
@@ -73,15 +62,24 @@ export const DashboardPage: React.FC = () => {
               {hasActiveFilters ? 'Search Results' : 'All Concerts'}
             </h2>
             <span className="text-gray-600">
-              {filteredConcerts.length} concert{filteredConcerts.length !== 1 ? 's' : ''} found
+              {concerts.length} concert{concerts.length !== 1 ? 's' : ''} found
             </span>
           </div>
         </div>
 
         {/* Concert Grid */}
-        {filteredConcerts.length > 0 ? (
+        {loading ? (
+          <div className="text-center py-12">
+            <p className="text-gray-600">Loading concerts...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-12">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Error</h3>
+            <p className="text-gray-600">{error}</p>
+          </div>
+        ) : concerts.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredConcerts.map((concert) => (
+            {concerts.map((concert) => (
               <ConcertCard key={concert.id} concert={concert} />
             ))}
           </div>
@@ -106,5 +104,13 @@ export const DashboardPage: React.FC = () => {
         )}
       </main>
     </div>
+  );
+};
+
+export const DashboardPage: React.FC = () => {
+  return (
+    <ConcertProvider>
+      <DashboardContent />
+    </ConcertProvider>
   );
 };

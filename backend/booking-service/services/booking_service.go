@@ -8,11 +8,11 @@ import (
 	"log"
 	"time"
 
-	"github.com/user-service/config"
-	"github.com/user-service/models"
+	"github.com/HeruAnggara/booking-system/backend/booking-service/config"
+	"github.com/HeruAnggara/booking-system/backend/booking-service/models"
 )
 
-// BookingService menangani logika bisnis untuk pemesanan
+// BookingService menangani logika bisnis untuk booking
 type BookingService struct {
 	cfg *config.Config
 }
@@ -22,33 +22,29 @@ func NewBookingService(cfg *config.Config) *BookingService {
 	return &BookingService{cfg: cfg}
 }
 
-// CreateBooking membuat pemesanan baru
+// CreateBooking membuat booking baru
 func (s *BookingService) CreateBooking(ctx context.Context, req *models.BookingCreateRequest) (*models.Booking, error) {
-	// Validasi ketersediaan kursi
+	// Validasi ketersediaan tiket (opsional, jika Concert model ada)
+	// Contoh: cek available_seats di tabel concerts
 	var availableSeats int
-	err := s.cfg.DB.QueryRowContext(ctx, "SELECT available_seats FROM concerts WHERE id = ?", req.ConcertID).
-		Scan(&availableSeats)
-	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("concert not found")
-	}
+	err := s.cfg.DB.QueryRowContext(ctx, "SELECT available_seats FROM concerts WHERE id = ?", req.ConcertID).Scan(&availableSeats)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check concert availability: %v", err)
+		return nil, fmt.Errorf("failed to check concert: %v", err)
 	}
-	if availableSeats < req.Seats {
-		return nil, fmt.Errorf("not enough seats available")
+	if availableSeats < req.TicketCount {
+		return nil, fmt.Errorf("insufficient tickets available")
 	}
 
-	// Mulai transaksi
-	tx, err := s.cfg.DB.BeginTx(ctx, nil)
+	// Update available_seats (opsional)
+	_, err = s.cfg.DB.ExecContext(ctx, "UPDATE concerts SET available_seats = available_seats - ? WHERE id = ?", req.TicketCount, req.ConcertID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to start transaction: %v", err)
+		return nil, fmt.Errorf("failed to update concert seats: %v", err)
 	}
-	defer tx.Rollback()
 
-	// Insert pemesanan
-	query := `INSERT INTO bookings (user_id, concert_id, seats, status, created_at, updated_at) 
-              VALUES (?, ?, ?, ?, ?, ?)`
-	result, err := tx.ExecContext(ctx, query, req.UserID, req.ConcertID, req.Seats, "pending", time.Now(), time.Now())
+	// Insert booking ke database
+	query := `INSERT INTO bookings (user_id, concert_id, ticket_count, total_price, status, created_at, updated_at) 
+              VALUES (?, ?, ?, ?, ?, ?, ?)`
+	result, err := s.cfg.DB.ExecContext(ctx, query, req.UserID, req.ConcertID, req.TicketCount, req.TotalPrice, "pending", time.Now(), time.Now())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create booking: %v", err)
 	}
@@ -58,29 +54,18 @@ func (s *BookingService) CreateBooking(ctx context.Context, req *models.BookingC
 		return nil, fmt.Errorf("failed to get last insert ID: %v", err)
 	}
 
-	// Update ketersediaan kursi
-	updateQuery := `UPDATE concerts SET available_seats = available_seats - ? WHERE id = ?`
-	_, err = tx.ExecContext(ctx, updateQuery, req.Seats, req.ConcertID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update concert seats: %v", err)
-	}
-
-	// Commit transaksi
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("failed to commit transaction: %v", err)
-	}
-
 	booking := &models.Booking{
-		ID:        int(bookingID),
-		UserID:    req.UserID,
-		ConcertID: req.ConcertID,
-		Seats:     req.Seats,
-		Status:    "pending",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		ID:          int(bookingID),
+		UserID:      req.UserID,
+		ConcertID:   req.ConcertID,
+		TicketCount: req.TicketCount,
+		TotalPrice:  req.TotalPrice,
+		Status:      "pending",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 	}
 
-	// Cache pemesanan di Redis
+	// Cache booking di Redis
 	cacheKey := fmt.Sprintf("booking:%d", bookingID)
 	bookingJSON, _ := json.Marshal(booking)
 	if err := s.cfg.Redis.Set(ctx, cacheKey, bookingJSON, 10*time.Minute).Err(); err != nil {
@@ -90,26 +75,29 @@ func (s *BookingService) CreateBooking(ctx context.Context, req *models.BookingC
 	return booking, nil
 }
 
-// GetBookingByID mengambil pemesanan berdasarkan ID
-func (s *BookingService) GetBookingByID(ctx context.Context, id int) (*models.Booking, error) {
+// GetBookingByID mengambil booking berdasarkan ID
+func (s *BookingService) GetBookingByID(ctx context.Context, id int, userID int) (*models.Booking, error) {
 	// Cek cache Redis
 	cacheKey := fmt.Sprintf("booking:%d", id)
 	cached, err := s.cfg.Redis.Get(ctx, cacheKey).Result()
 	if err == nil {
 		var booking models.Booking
 		if err := json.Unmarshal([]byte(cached), &booking); err == nil {
-			return &booking, nil
+			if booking.UserID == userID {
+				return &booking, nil
+			}
+			return nil, nil // Booking milik user lain
 		}
 		log.Printf("Failed to unmarshal cached booking %d: %v", id, err)
 	}
 
-	// Query database jika tidak ada di cache
+	// Query database
 	booking := &models.Booking{}
-	query := `SELECT id, user_id, concert_id, seats, status, created_at, updated_at 
-              FROM bookings WHERE id = ?`
-	err = s.cfg.DB.QueryRowContext(ctx, query, id).Scan(
-		&booking.ID, &booking.UserID, &booking.ConcertID, &booking.Seats, 
-		&booking.Status, &booking.CreatedAt, &booking.UpdatedAt,
+	query := `SELECT id, user_id, concert_id, ticket_count, total_price, status, created_at, updated_at 
+              FROM bookings WHERE id = ? AND user_id = ?`
+	err = s.cfg.DB.QueryRowContext(ctx, query, id, userID).Scan(
+		&booking.ID, &booking.UserID, &booking.ConcertID, &booking.TicketCount,
+		&booking.TotalPrice, &booking.Status, &booking.CreatedAt, &booking.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -125,4 +113,44 @@ func (s *BookingService) GetBookingByID(ctx context.Context, id int) (*models.Bo
 	}
 
 	return booking, nil
+}
+
+func (s *BookingService) DeleteBooking(ctx context.Context, id int, userID int) error {
+	// Ambil booking untuk memvalidasi dan mendapatkan ticket_count
+	booking, err := s.GetBookingByID(ctx, id, userID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch booking for deletion: %v", err)
+	}
+	if booking == nil {
+		return fmt.Errorf("booking not found or not owned by user")
+	}
+
+	// Kembalikan available_seats ke concert
+	_, err = s.cfg.DB.ExecContext(ctx, "UPDATE concerts SET available_seats = available_seats + ? WHERE id = ?", booking.TicketCount, booking.ConcertID)
+	if err != nil {
+		return fmt.Errorf("failed to update concert seats: %v", err)
+	}
+
+	// Hapus booking dari database
+	query := `DELETE FROM bookings WHERE id = ? AND user_id = ?`
+	result, err := s.cfg.DB.ExecContext(ctx, query, id, userID)
+	if err != nil {
+		return fmt.Errorf("failed to delete booking: %v", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %v", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("no booking deleted")
+	}
+
+	// Hapus cache Redis
+	cacheKey := fmt.Sprintf("booking:%d", id)
+	if err := s.cfg.Redis.Del(ctx, cacheKey).Err(); err != nil {
+		log.Printf("Failed to delete cache for booking %d: %v", id, err)
+	}
+
+	return nil
 }

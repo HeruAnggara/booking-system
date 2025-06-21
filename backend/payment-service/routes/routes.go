@@ -4,7 +4,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/swagger"
-	"github.com/payment-service/controllers"
+	"github.com/HeruAnggara/booking-system/backend/payment-service/controllers"
 )
 
 // SetupRoutes mengatur rute API
@@ -17,6 +17,7 @@ func SetupRoutes(app *fiber.App, paymentCtrl *controllers.PaymentController) {
 
 	// API routes
 	api := app.Group("/api")
+	api.Use(controllers.JWTMiddleware())
 	api.Post("/payments", paymentCtrl.CreatePayment)
 	api.Get("/payments/:id", paymentCtrl.GetPaymentByID)
 }

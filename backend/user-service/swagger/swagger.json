@@ -8,6 +8,14 @@
   "host": "localhost:8081",
   "basePath": "/api",
   "schemes": ["http"],
+  "securityDefinitions": {
+    "BearerAuth": {
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header",
+      "description": "Enter token in format: Bearer <token>"
+    }
+  },
   "paths": {
     "/users": {
       "post": {
@@ -70,6 +78,11 @@
             "description": "User ID"
           }
         ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "User found",
@@ -106,6 +119,112 @@
           }
         }
       }
+    },
+    "/users/me": {
+      "get": {
+        "summary": "Get current user",
+        "description": "Retrieve details of the authenticated user",
+        "tags": ["Users"],
+        "produces": ["application/json"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User found",
+            "schema": {
+              "$ref": "#/definitions/User"
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {"type": "string"}
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {"type": "string"}
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/login": {
+      "post": {
+        "summary": "User login",
+        "description": "Authenticate user with email and password, return JWT token",
+        "tags": ["Users"],
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "login",
+            "description": "Login credentials",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/LoginRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "token": {"type": "string"}
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {"type": "string"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {"type": "string"}
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
     }
   },
   "definitions": {
@@ -124,6 +243,13 @@
       "properties": {
         "email": {"type": "string"},
         "name": {"type": "string"},
+        "password": {"type": "string"}
+      }
+    },
+    "LoginRequest": {
+      "type": "object",
+      "properties": {
+        "email": {"type": "string"},
         "password": {"type": "string"}
       }
     }

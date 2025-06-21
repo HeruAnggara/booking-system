@@ -5,33 +5,42 @@ export interface User {
   createdAt: string;
 }
 
+export interface TicketType {
+  id: number;
+  name: string;
+  concert_id: number;
+  type: string;
+  price: number;
+  total_seats: number;
+  available_seats: number;
+}
+
 export interface Concert {
-  id: string;
+  id: number;
+  name: string;
   title: string;
   artist: string;
-  date: string;
-  time: string;
   venue: string;
   city: string;
+  date: string;
+  time: string;
+  total_seats: number;
+  available_seats: number;
+  status: 'on-sale' | 'upcoming' | 'sold-out';
   image: string;
   description: string;
   ticketTypes: TicketType[];
-  status: 'upcoming' | 'on-sale' | 'sold-out';
-}
-
-export interface TicketType {
-  id: string;
-  name: string;
-  price: number;
-  available: number;
-  description: string;
+  created_at: string;
 }
 
 export interface BookingItem {
-  concertId: string;
-  ticketTypeId: string;
+  id?: number;
+  concertId: number;
+  ticketTypeId: number;
   quantity: number;
   price: number;
+  userId?: number;
+  createdAt?: string;
 }
 
 export interface Booking {
@@ -55,12 +64,23 @@ export interface AuthContextType {
   register: (email: string, password: string, name: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
+  token: string | null;
 }
 
 export interface BookingContextType {
   currentBooking: BookingItem[];
   addToBooking: (item: BookingItem) => void;
-  removeFromBooking: (concertId: string, ticketTypeId: string) => void;
+  removeFromBooking: (concertId: number, ticketTypeId: number) => void;
   clearBooking: () => void;
   getTotalAmount: () => number;
+}
+
+export interface ConcertsResponse {
+  concerts: Concert[];
+  status: number;
+}
+
+export interface ConcertDetailResponse {
+  concert: Concert;
+  status: number;
 }

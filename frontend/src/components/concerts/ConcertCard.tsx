@@ -91,10 +91,10 @@ export const ConcertCard: React.FC<ConcertCardProps> = ({ concert }) => {
             </div>
             <Button
               onClick={() => navigate(`/concert/${concert.id}`)}
-              disabled={concert.status === 'sold-out'}
+              disabled={concert.available_seats === 0}
               className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
             >
-              {concert.status === 'sold-out' ? 'Sold Out' : 'Book Now'}
+              {concert.available_seats == 0 ? 'Sold Out' : 'Book Now'}
             </Button>
           </div>
         </div>

@@ -44,7 +44,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
         <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-500 bg-clip-text text-transparent">
           ConcertBook
         </h1>
-        <p className="text-gray-500 mt-2">Your gateway to amazing live music</p>
       </div>
 
       <Card className="backdrop-blur-sm bg-white/90 border-0 shadow-2xl">
