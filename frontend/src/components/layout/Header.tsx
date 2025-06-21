@@ -13,15 +13,11 @@ import { useConcert } from '@/contexts/ConcertContext';
 export const Header: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { currentBooking, removeFromBooking, getTotalAmount } = useBooking();
+  const { pendingBookings, removeFromBooking } = useBooking();
   const { getConcertById } = useConcert();
 
-  const concerts = useMemo(() => {
-    return currentBooking.map((item) => getConcertById(item.concertId.toString()));
-  }, [currentBooking, getConcertById]);
+  const totalItems = useMemo(() => pendingBookings.reduce((sum, item) => sum + (item.ticket_count ?? 0), 0), [pendingBookings]);
     
-  const totalItems = currentBooking.reduce((sum, item) => sum + item.quantity, 0);
-
   const handleViewCart = () => {
     navigate('/booking');
   };
@@ -66,7 +62,7 @@ export const Header: React.FC = () => {
                     <Badge variant="outline">{totalItems} items</Badge>
                   </div>
                   
-                  {currentBooking.length === 0 ? (
+                  {pendingBookings.length === 0 ? (
                     <div className="text-center py-6">
                       <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-3" />
                       <p className="text-gray-500 text-sm">Your cart is empty</p>
@@ -75,14 +71,13 @@ export const Header: React.FC = () => {
                   ) : (
                     <>
                       <div className="space-y-3 max-h-64 overflow-y-auto">
-                        {currentBooking.map((item, index) => {
-                          const concert = concerts[index];
-                          const ticketType = concert?.ticketTypes.find(t => t.id === item.ticketTypeId);
-                          
+                        {pendingBookings.map((item) => {
+                          const concert = getConcertById(item.concert_id?.toString() ?? '');
+                          const ticketType = concert?.ticketTypes;
                           if (!concert || !ticketType) return null;
-
+                          
                           return (
-                            <Card key={`${item.concertId}-${item.ticketTypeId}`} className="border-gray-200">
+                            <Card key={`${item.concert_id}-${item.userId}`} className="border-gray-200">
                               <CardContent className="p-3">
                                 <div className="flex items-start justify-between">
                                   <div className="flex-1 min-w-0">
@@ -90,14 +85,14 @@ export const Header: React.FC = () => {
                                       {concert.name}
                                     </h4>
                                     <p className="text-xs text-gray-600 truncate">
-                                      {ticketType.name} Ticket
+                                      {ticketType?.[0]?.type} Ticket
                                     </p>
                                     <div className="flex items-center justify-between mt-2">
                                       <span className="text-xs text-gray-500">
-                                        {item.quantity} × ${item.price.toFixed(2)}
+                                        {item.ticket_count} × ${item?.total_price?.toFixed(2)}
                                       </span>
                                       <span className="font-semibold text-sm text-blue-600">
-                                        ${(item.price * item.quantity).toFixed(2)}
+                                        ${item.ticket_count && item.total_price ? (item.ticket_count * item.total_price).toFixed(2) : '0'}
                                       </span>
                                     </div>
                                   </div>
@@ -120,7 +115,7 @@ export const Header: React.FC = () => {
                         <div className="flex items-center justify-between mb-3">
                           <span className="font-semibold text-gray-900">Total:</span>
                           <span className="font-bold text-lg text-blue-600">
-                            ${getTotalAmount().toFixed(2)}
+                            ${pendingBookings.reduce((acc, item) => acc + ((item.ticket_count ?? 0) * (item.total_price ?? 0)), 0).toFixed(2)}
                           </span>
                         </div>
                         <Button 

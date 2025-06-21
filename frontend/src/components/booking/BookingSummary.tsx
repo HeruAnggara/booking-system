@@ -11,14 +11,14 @@ import { Trash2, CreditCard, CheckCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { useConcert } from '@/contexts/ConcertContext';
-import { usePayment } from '@/contexts/PaymentContext'; // Import PaymentContext
+import { usePayment } from '@/contexts/PaymentContext';
 
 export const BookingSummary: React.FC = () => {
   const navigate = useNavigate();
-  const { currentBooking, removeFromBooking, getTotalAmount } = useBooking();
+  const { currentBooking, pendingBookings, removeFromBooking } = useBooking();console.log(pendingBookings)
   const { user } = useAuth();
   const { getConcertById } = useConcert();
-  const { processPayment, loading: paymentLoading, error: paymentError } = usePayment(); // Use PaymentContext
+  const { processPayment, loading: paymentLoading, error: paymentError } = usePayment();
   const [customerInfo, setCustomerInfo] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -30,7 +30,16 @@ export const BookingSummary: React.FC = () => {
     setCustomerInfo(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleRemoveItem = (concertId: number, ticketTypeId: number) => {
+  const handleRemoveItem = (concertId: number, ticketTypeId: number, isPending: boolean) => {
+    if (isPending) {
+      // Logic to cancel pending booking (e.g., call backend to update status)
+      toast({
+        title: "Pending item removal",
+        description: "Pending bookings cannot be removed directly. Contact support to cancel.",
+        variant: "default",
+      });
+      return;
+    }
     removeFromBooking(concertId, ticketTypeId);
     toast({
       title: "Removed from cart",
@@ -73,7 +82,7 @@ export const BookingSummary: React.FC = () => {
     );
   }
 
-  if (currentBooking.length === 0) {
+  if (currentBooking.length === 0 && pendingBookings.length === 0) {
     return (
       <Card className="max-w-md mx-auto">
         <CardContent className="pt-6">
@@ -98,51 +107,93 @@ export const BookingSummary: React.FC = () => {
     <Card className="max-w-2xl mx-auto">
       <CardHeader>
         <CardTitle>Booking Summary</CardTitle>
-        <CardDescription>Review your tickets and complete your purchase</CardDescription>
+        <CardDescription>Review your current cart and pending bookings</CardDescription>
       </CardHeader>
-      
       <CardContent className="space-y-6">
-        {/* Cart Items */}
-        <div className="space-y-4">
-          {currentBooking.map((item) => {
-            const concert = getConcertById(item.concertId.toString());
-            const ticketType = concert?.ticketTypes.find(t => t.id === item.ticketTypeId);
-            
-            if (!concert || !ticketType) return null;
+        {/* Current Cart Items */}
+        {currentBooking.length > 0 && (
+          <>
+            <h3 className="font-semibold">Current Cart</h3>
+            <div className="space-y-4">
+              {currentBooking.map((item) => {
+                const concert = getConcertById(item.concertId.toString());
+                const ticketType = concert?.ticketTypes.find(t => t.id === item.ticketTypeId);
+                if (!concert || !ticketType) return null;
+                return (
+                  <div key={`${item.concertId}-${item.ticketTypeId}`} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex-1">
+                      <h4 className="font-semibold">{concert.title}</h4>
+                      <p className="text-sm text-gray-600">{ticketType.name}</p>
+                      <p className="text-sm text-gray-500">
+                        Quantity: {item.quantity} × ${item.price.toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <span className="font-semibold">${(item.price * item.quantity).toFixed(2)}</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRemoveItem(item.concertId, item.ticketTypeId, false)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <Separator />
+          </>
+        )}
 
-            return (
-              <div key={`${item.concertId}-${item.ticketTypeId}`} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex-1">
-                  <h4 className="font-semibold">{concert.title}</h4>
-                  <p className="text-sm text-gray-600">{ticketType.name}</p>
-                  <p className="text-sm text-gray-500">
-                    Quantity: {item.quantity} × ${item.price.toFixed(2)}
-                  </p>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <span className="font-semibold">
-                    ${(item.price * item.quantity).toFixed(2)}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleRemoveItem(item.concertId, item.ticketTypeId)}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <Separator />
+        {/* Pending Bookings */}
+        {pendingBookings.length > 0 && (
+          <>
+            <h3 className="font-semibold">Pending Bookings</h3>
+            <div className="space-y-4">
+              {pendingBookings.map((item) => {
+                const concert = getConcertById(item.concert_id?.toString() ?? '');
+                const ticketType = concert?.ticketTypes;
+                if (!concert || !ticketType) return null;
+                return (
+                  <div key={`${item.concert_id}-${item.userId}`} className="flex items-center justify-between p-4 border rounded-lg bg-gray-50">
+                    <div className="flex-1">
+                      <h4 className="font-semibold">{concert.name}</h4>
+                      <p className="text-sm text-gray-600">{ticketType?.[0]?.type}</p>
+                      <p className="text-sm text-gray-500">
+                        Quantity: {item.ticket_count} × ${item?.total_price?.toFixed(2)}
+                      </p>
+                      <p className="text-sm text-yellow-600">Status: Pending</p>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <span className="font-semibold">${item.ticket_count && item.total_price ? (item.ticket_count * item.total_price).toFixed(2) : '0'}</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRemoveItem(item.concertId, item.ticketTypeId, true)}
+                        disabled
+                        className="text-gray-400 cursor-not-allowed"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <Separator />
+          </>
+        )}
 
         {/* Total */}
         <div className="flex justify-between items-center text-lg font-bold">
-          <span>Total Amount:</span>
-          <span className="text-blue-600">${getTotalAmount().toFixed(2)}</span>
+          <span>Total Amount (Current Cart):</span>
+          <span className="text-blue-600">
+            <span className="font-semibold">
+              ${pendingBookings.reduce((acc, item) => acc + ((item.ticket_count ?? 0) * (item.total_price ?? 0)), 0).toFixed(2)}
+            </span>
+          </span>
         </div>
 
         <Separator />
@@ -188,7 +239,7 @@ export const BookingSummary: React.FC = () => {
         {/* Payment Button */}
         <Button
           onClick={handleProcessPayment}
-          disabled={paymentLoading}
+          disabled={paymentLoading || pendingBookings.length === 0}
           className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
           size="lg"
         >
@@ -200,7 +251,7 @@ export const BookingSummary: React.FC = () => {
           ) : (
             <>
               <CreditCard className="h-4 w-4 mr-2" />
-              Complete Payment (${getTotalAmount().toFixed(2)})
+              Complete Payment (${pendingBookings.reduce((acc, item) => acc + ((item.ticket_count ?? 0) * (item.total_price ?? 0)), 0).toFixed(2)})
             </>
           )}
         </Button>

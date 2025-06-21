@@ -36,9 +36,12 @@ export interface Concert {
 export interface BookingItem {
   id?: number;
   concertId: number;
+  concert_id?: number;
   ticketTypeId: number;
   quantity: number;
   price: number;
+  ticket_count?: number;
+  total_price?: number;
   userId?: number;
   createdAt?: string;
 }
@@ -69,6 +72,7 @@ export interface AuthContextType {
 
 export interface BookingContextType {
   currentBooking: BookingItem[];
+  pendingBookings: BookingItem[];
   addToBooking: (item: BookingItem) => void;
   removeFromBooking: (concertId: number, ticketTypeId: number) => void;
   clearBooking: () => void;

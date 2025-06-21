@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { BookingItem, BookingContextType } from '@/types';
+import { useAuth } from './AuthContext';
 
 const BookingContext = createContext<BookingContextType | undefined>(undefined);
 
@@ -16,7 +17,29 @@ interface BookingProviderProps {
 }
 
 export const BookingProvider: React.FC<BookingProviderProps> = ({ children }) => {
+  const { user, token } = useAuth();
   const [currentBooking, setCurrentBooking] = useState<BookingItem[]>([]);
+   const [pendingBookings, setPendingBookings] = useState<BookingItem[]>([]);
+
+  useEffect(() => {
+    const fetchPendingBookings = async () => {
+      if (!user?.id || !token) return;
+      try {
+        const response = await fetch('http://localhost:8082/api/bookings/pending', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (!response.ok) throw new Error('Failed to fetch pending bookings');
+        const data = await response.json();
+        setPendingBookings(data.data || []);
+      } catch (err) {
+        console.error('Error fetching pending bookings:', err);
+      }
+    };
+    fetchPendingBookings();
+  }, [user?.id, token]);
 
   const addToBooking = async (item: BookingItem) => {
     try {
@@ -127,6 +150,7 @@ export const BookingProvider: React.FC<BookingProviderProps> = ({ children }) =>
 
   const value: BookingContextType = {
     currentBooking,
+    pendingBookings,
     addToBooking,
     removeFromBooking,
     clearBooking,

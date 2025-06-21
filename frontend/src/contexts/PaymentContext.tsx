@@ -13,7 +13,7 @@ const PaymentContext = createContext<PaymentContextType | undefined>(undefined);
 
 export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const { currentBooking, clearBooking, getTotalAmount } = useBooking();
+  const { pendingBookings, clearBooking } = useBooking();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,17 +25,17 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No authentication token found');
 
-      // Use the first booking's ID or assume a single booking_id is provided
-      if (currentBooking.length === 0) throw new Error('No bookings in cart');
-      const bookingId = currentBooking[0].id || 1; // Adjust based on your BookingContext structure
+      if (pendingBookings.length === 0) throw new Error('No bookings in cart');
+      const bookingId = pendingBookings[0].id || 1; // Adjust based on your BookingContext structure
+      const totalAmount = pendingBookings.reduce((acc, item) => acc + ((item.ticket_count ?? 0) * (item.total_price ?? 0)), 0).toFixed(2)
 
       const paymentData = {
-        user_id: user?.id || 1, // Match backend's user_id
+        user_id: user?.id || 1,
         booking_id: bookingId,
-        amount: getTotalAmount(), // Use total amount from BookingContext
+        amount: Number(totalAmount),
       };
 
-      console.log('Sending payment request:', paymentData); // Debug
+      console.log('Sending payment request:', paymentData);
       const response = await fetch('http://localhost:8083/api/payments', {
         method: 'POST',
         headers: {
@@ -51,7 +51,21 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
       }
 
       const data = await response.json();
-      if (data.status === 201) { // Match backend response status
+      if (data.status === 201) {
+        // Notify booking service to complete the booking
+        const completeResponse = await fetch(`http://localhost:8082/api/bookings/${bookingId}/complete`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!completeResponse.ok) {
+          const errorData = await completeResponse.json();
+          throw new Error(errorData.message || `Failed to complete booking! status: ${completeResponse.status}`);
+        }
+
         clearBooking();
         toast({
           title: "Payment successful!",
