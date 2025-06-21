@@ -154,3 +154,107 @@ func (s *BookingService) DeleteBooking(ctx context.Context, id int, userID int) 
 
 	return nil
 }
+
+// GetPendingBookings mengambil semua booking yang masih pending untuk user
+func (s *BookingService) GetPendingBookings(ctx context.Context, userID int) ([]models.Booking, error) {
+	// Cek cache Redis
+	cacheKey := fmt.Sprintf("pending_bookings:%d", userID)
+	cached, err := s.cfg.Redis.Get(ctx, cacheKey).Result()
+	if err == nil {
+		var bookings []models.Booking
+		if err := json.Unmarshal([]byte(cached), &bookings); err == nil {
+			return bookings, nil
+		}
+		log.Printf("Failed to unmarshal cached pending bookings for user %d: %v", userID, err)
+	}
+
+	// Query database
+	var bookings []models.Booking
+	query := `SELECT id, user_id, concert_id, ticket_count, total_price, status, created_at, updated_at 
+              FROM bookings WHERE user_id = ? AND status = ?`
+	rows, err := s.cfg.DB.QueryContext(ctx, query, userID, "pending")
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch pending bookings: %v", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var booking models.Booking
+		err = rows.Scan(
+			&booking.ID, &booking.UserID, &booking.ConcertID, &booking.TicketCount,
+			&booking.TotalPrice, &booking.Status, &booking.CreatedAt, &booking.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan booking row: %v", err)
+		}
+		bookings = append(bookings, booking)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over booking rows: %v", err)
+	}
+
+	// Cache hasil query
+	bookingsJSON, _ := json.Marshal(bookings)
+	if err := s.cfg.Redis.Set(ctx, cacheKey, bookingsJSON, 10*time.Minute).Err(); err != nil {
+		log.Printf("Failed to cache pending bookings for user %d: %v", userID, err)
+	}
+
+	return bookings, nil
+}
+
+// CompleteBooking mengubah status booking menjadi "completed" setelah pembayaran berhasil
+func (s *BookingService) CompleteBooking(ctx context.Context, id int, userID int) error {
+	// Cek cache Redis
+	cacheKey := fmt.Sprintf("booking:%d", id)
+	cached, err := s.cfg.Redis.Get(ctx, cacheKey).Result()
+	if err == nil {
+		var booking models.Booking
+		if err := json.Unmarshal([]byte(cached), &booking); err == nil {
+			if booking.UserID == userID && booking.Status == "pending" {
+				// Update status di cache
+				booking.Status = "completed"
+				bookingJSON, _ := json.Marshal(booking)
+				if err := s.cfg.Redis.Set(ctx, cacheKey, bookingJSON, 10*time.Minute).Err(); err != nil {
+					log.Printf("Failed to update cache for booking %d: %v", id, err)
+				}
+				return nil
+			}
+			return fmt.Errorf("booking not found, not owned by user, or not pending")
+		}
+		log.Printf("Failed to unmarshal cached booking %d: %v", id, err)
+	}
+
+	// Query database untuk validasi
+	booking := &models.Booking{}
+	query := `SELECT id, user_id, concert_id, ticket_count, total_price, status, created_at, updated_at 
+              FROM bookings WHERE id = ? AND user_id = ?`
+	err = s.cfg.DB.QueryRowContext(ctx, query, id, userID).Scan(
+		&booking.ID, &booking.UserID, &booking.ConcertID, &booking.TicketCount,
+		&booking.TotalPrice, &booking.Status, &booking.CreatedAt, &booking.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("booking not found or not owned by user")
+	}
+	if err != nil {
+		return fmt.Errorf("failed to fetch booking: %v", err)
+	}
+	if booking.Status != "pending" {
+		return fmt.Errorf("booking status is not pending")
+	}
+
+	// Update status di database
+	updateQuery := `UPDATE bookings SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?`
+	_, err = s.cfg.DB.ExecContext(ctx, updateQuery, "completed", time.Now(), id, userID)
+	if err != nil {
+		return fmt.Errorf("failed to update booking status: %v", err)
+	}
+
+	// Update cache
+	booking.Status = "completed"
+	bookingJSON, _ := json.Marshal(booking)
+	if err := s.cfg.Redis.Set(ctx, cacheKey, bookingJSON, 10*time.Minute).Err(); err != nil {
+		log.Printf("Failed to cache updated booking %d: %v", id, err)
+	}
+
+	return nil
+}

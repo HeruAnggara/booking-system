@@ -169,3 +169,58 @@ func (c *BookingController) DeleteBooking(ctx *fiber.Ctx) error {
 
 	return ctx.SendStatus(http.StatusNoContent)
 }
+
+// GetPendingBookings menangani GET /api/bookings/pending
+// @Summary Get pending bookings
+// @Description Retrieve all pending bookings for the authenticated user
+// @Tags Bookings
+// @Produce json
+// @Success 200 {array} models.Booking
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /bookings/pending [get]
+func (ctrl *BookingController) GetPendingBookings(c *fiber.Ctx) error {
+	userID, ok := c.Locals("user_id").(int)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"status": 401, "message": "Unauthorized"})
+	}
+
+	bookings, err := ctrl.service.GetPendingBookings(c.Context(), userID)
+	if err != nil {
+		log.Printf("Failed to fetch pending bookings for user %d: %v", userID, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"status": 500, "message": "Failed to fetch pending bookings"})
+	}
+
+	return c.JSON(fiber.Map{"status": 200, "data": bookings})
+}
+
+// CompleteBooking menangani PUT /api/bookings/:id/complete
+// @Summary Complete a booking
+// @Description Update booking status to "completed" after successful payment
+// @Tags Bookings
+// @Produce json
+// @Param id path int true "Booking ID"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /bookings/{id}/complete [put]
+func (ctrl *BookingController) CompleteBooking(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": 400, "message": "Invalid booking ID"})
+	}
+
+	userID, ok := c.Locals("user_id").(int)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"status": 401, "message": "Unauthorized"})
+	}
+
+	err = ctrl.service.CompleteBooking(c.Context(), id, userID)
+	if err != nil {
+		log.Printf("Failed to complete booking %d for user %d: %v", id, userID, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"status": 500, "message": err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"status": 200, "message": "Booking completed successfully"})
+}

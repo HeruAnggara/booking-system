@@ -27,6 +27,7 @@ func SetupRoutes(app *fiber.App, bookingCtrl *controllers.BookingController, con
 	bookings := api.Group("/bookings")
 	bookings.Use(controllers.JWTMiddleware())
 	bookings.Post("/", bookingCtrl.CreateBooking)
-	bookings.Get("/:id", bookingCtrl.GetBookingByID)
 	bookings.Delete("/:id", bookingCtrl.DeleteBooking)
+	bookings.Get("/pending", bookingCtrl.GetPendingBookings)
+	bookings.Put("/:id/complete", bookingCtrl.CompleteBooking)
 }
