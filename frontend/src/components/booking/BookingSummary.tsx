@@ -30,7 +30,7 @@ export const BookingSummary: React.FC = () => {
     setCustomerInfo(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleRemoveItem = (concertId: number, ticketTypeId: number, isPending: boolean) => {
+  const handleRemoveItem = (concertId: number, ticketTypeId: number, isPending: boolean) => {    
     if (isPending) {
       // Logic to cancel pending booking (e.g., call backend to update status)
       toast({
@@ -171,9 +171,8 @@ export const BookingSummary: React.FC = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleRemoveItem(item.concertId, item.ticketTypeId, true)}
-                        disabled
-                        className="text-gray-400 cursor-not-allowed"
+                        onClick={() => handleRemoveItem(item.concert_id ?? 0, ticketType?.[0].id, false)}
+                        className="text-gray-400"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

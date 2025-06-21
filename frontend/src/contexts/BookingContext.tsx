@@ -93,13 +93,9 @@ export const BookingProvider: React.FC<BookingProviderProps> = ({ children }) =>
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No authentication token found');
+      const id = pendingBookings.filter(b => b.concert_id  === concertId)[0].id;
 
-      const item = currentBooking.find(
-        (booking) => booking.concertId === Number(concertId) && booking.ticketTypeId === Number(ticketTypeId)
-      );
-      if (!item?.id) throw new Error('Booking item not found');
-
-      const response = await fetch(`http://localhost:8082/api/bookings/${item.id}`, {
+      const response = await fetch(`http://localhost:8082/api/bookings/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -109,10 +105,9 @@ export const BookingProvider: React.FC<BookingProviderProps> = ({ children }) =>
       if (!response.ok) {
         throw new Error('Failed to remove from booking');
       }
-
-      setCurrentBooking((prev) =>
+      setPendingBookings((prev) =>
         prev.filter(
-          (booking) => !(booking.concertId === Number(concertId) && booking.ticketTypeId === Number(ticketTypeId))
+          (booking) => !(booking.concert_id === Number(concertId))
         )
       );
     } catch (err) {
