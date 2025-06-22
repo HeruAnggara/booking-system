@@ -24,7 +24,11 @@ func NewBookingService(cfg *config.Config) *BookingService {
 
 // CreateBooking membuat booking baru
 func (s *BookingService) CreateBooking(ctx context.Context, req *models.BookingCreateRequest) (*models.Booking, error) {
-	// Validasi ketersediaan tiket (opsional, jika Concert model ada)
+	cachePendingKey := fmt.Sprintf("pending_bookings:%d", req.UserID)
+	if err := s.cfg.Redis.Del(ctx, cachePendingKey).Err(); err != nil {
+		log.Printf("Failed to delete pending bookings cache for user %d: %v", req.UserID, err)
+	}
+
 	// Contoh: cek available_seats di tabel concerts
 	var availableSeats int
 	err := s.cfg.DB.QueryRowContext(ctx, "SELECT available_seats FROM concerts WHERE id = ?", req.ConcertID).Scan(&availableSeats)
@@ -66,19 +70,20 @@ func (s *BookingService) CreateBooking(ctx context.Context, req *models.BookingC
 	}
 
 	// Cache booking di Redis
-	cacheKey := fmt.Sprintf("booking:%d", bookingID)
+	cacheKey := fmt.Sprintf("booking:%d:%d", req.UserID, bookingID)
 	bookingJSON, _ := json.Marshal(booking)
 	if err := s.cfg.Redis.Set(ctx, cacheKey, bookingJSON, 10*time.Minute).Err(); err != nil {
 		log.Printf("Failed to cache booking %d: %v", bookingID, err)
 	}
 
-	cachePendingKey := fmt.Sprintf("pending_bookings:%d", req.UserID)
-	if err := s.cfg.Redis.Del(ctx, cachePendingKey).Err(); err != nil {
-		log.Printf("Failed to delete cache for pending bookings of user %d: %v", req.UserID, err)
-	}
-	// Cache pending bookings di Redis
-	if err := s.cfg.Redis.LPush(ctx, cachePendingKey, bookingJSON).Err(); err != nil {
-		log.Printf("Failed to cache pending booking %d: %v", bookingID, err)
+	pendingBookings, err := s.GetPendingBookings(ctx, req.UserID)
+	if err != nil {
+		log.Printf("Failed to fetch pending bookings for cache update: %v", err)
+	} else {
+		pendingJSON, _ := json.Marshal(pendingBookings)
+		if err := s.cfg.Redis.Set(ctx, cachePendingKey, pendingJSON, 10*time.Minute).Err(); err != nil {
+			log.Printf("Failed to update pending bookings cache for user %d: %v", req.UserID, err)
+		}
 	}
 
 	return booking, nil
@@ -86,8 +91,8 @@ func (s *BookingService) CreateBooking(ctx context.Context, req *models.BookingC
 
 // GetBookingByID mengambil booking berdasarkan ID
 func (s *BookingService) GetBookingByID(ctx context.Context, id int, userID int) (*models.Booking, error) {
-	// Cek cache Redis
-	cacheKey := fmt.Sprintf("booking:%d", id)
+	// Use cache key including userID to avoid cross-user data leak
+	cacheKey := fmt.Sprintf("booking:%d:%d", userID, id)
 	cached, err := s.cfg.Redis.Get(ctx, cacheKey).Result()
 	if err == nil {
 		var booking models.Booking
@@ -95,9 +100,10 @@ func (s *BookingService) GetBookingByID(ctx context.Context, id int, userID int)
 			if booking.UserID == userID {
 				return &booking, nil
 			}
-			return nil, nil // Booking milik user lain
+			// Booking belongs to another user, return nil explicitly
+			return nil, nil
 		}
-		log.Printf("Failed to unmarshal cached booking %d: %v", id, err)
+		log.Printf("Failed to unmarshal cached booking %d for user %d: %v", id, userID, err)
 	}
 
 	// Query database
@@ -115,10 +121,10 @@ func (s *BookingService) GetBookingByID(ctx context.Context, id int, userID int)
 		return nil, fmt.Errorf("failed to fetch booking: %v", err)
 	}
 
-	// Cache hasil query
+	// Cache hasil query with userID in key
 	bookingJSON, _ := json.Marshal(booking)
 	if err := s.cfg.Redis.Set(ctx, cacheKey, bookingJSON, 10*time.Minute).Err(); err != nil {
-		log.Printf("Failed to cache booking %d: %v", id, err)
+		log.Printf("Failed to cache booking %d for user %d: %v", id, userID, err)
 	}
 
 	return booking, nil
