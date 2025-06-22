@@ -73,6 +73,7 @@ export interface AuthContextType {
 export interface BookingContextType {
   currentBooking: BookingItem[];
   pendingBookings: BookingItem[];
+  fetchPendingBookings: () => Promise<void>;
   addToBooking: (item: BookingItem) => void;
   removeFromBooking: (concertId: number, ticketTypeId: number) => void;
   clearBooking: () => void;
