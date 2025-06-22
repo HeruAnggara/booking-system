@@ -248,8 +248,8 @@ func (s *BookingService) CompleteBooking(ctx context.Context, id int, userID int
 	// Query database untuk validasi
 	booking := &models.Booking{}
 	query := `SELECT id, user_id, concert_id, ticket_count, total_price, status, created_at, updated_at 
-              FROM bookings WHERE id = ? AND user_id = ?`
-	err = s.cfg.DB.QueryRowContext(ctx, query, id, userID).Scan(
+              FROM bookings WHERE status = ? AND user_id = ?`
+	err = s.cfg.DB.QueryRowContext(ctx, query, "pending", userID).Scan(
 		&booking.ID, &booking.UserID, &booking.ConcertID, &booking.TicketCount,
 		&booking.TotalPrice, &booking.Status, &booking.CreatedAt, &booking.UpdatedAt,
 	)
@@ -264,8 +264,8 @@ func (s *BookingService) CompleteBooking(ctx context.Context, id int, userID int
 	}
 
 	// Update status di database
-	updateQuery := `UPDATE bookings SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?`
-	_, err = s.cfg.DB.ExecContext(ctx, updateQuery, "completed", time.Now(), id, userID)
+	updateQuery := `UPDATE bookings SET status = ?, updated_at = ? WHERE  status = ? AND user_id = ?`
+	_, err = s.cfg.DB.ExecContext(ctx, updateQuery, "completed", time.Now(), "pending", userID)
 	if err != nil {
 		return fmt.Errorf("failed to update booking status: %v", err)
 	}
