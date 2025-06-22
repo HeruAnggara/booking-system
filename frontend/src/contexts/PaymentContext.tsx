@@ -13,7 +13,7 @@ const PaymentContext = createContext<PaymentContextType | undefined>(undefined);
 
 export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const { pendingBookings, clearBooking } = useBooking();
+  const { pendingBookings, fetchPendingBookings, clearBooking } = useBooking();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,6 +71,7 @@ export const PaymentProvider: React.FC<{ children: ReactNode }> = ({ children })
           title: "Payment successful!",
           description: "Your tickets have been booked successfully.",
         });
+        await fetchPendingBookings();
         return true;
       } else {
         throw new Error(data.message || 'Payment processing failed');
