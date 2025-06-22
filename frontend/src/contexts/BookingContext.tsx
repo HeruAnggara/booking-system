@@ -127,6 +127,7 @@ export const BookingProvider: React.FC<BookingProviderProps> = ({ children }) =>
   const value: BookingContextType = {
     currentBooking,
     pendingBookings,
+    fetchPendingBookings,
     addToBooking,
     removeFromBooking,
     clearBooking,
