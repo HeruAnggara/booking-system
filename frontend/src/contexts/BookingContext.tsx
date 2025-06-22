@@ -21,23 +21,24 @@ export const BookingProvider: React.FC<BookingProviderProps> = ({ children }) =>
   const [currentBooking, setCurrentBooking] = useState<BookingItem[]>([]);
    const [pendingBookings, setPendingBookings] = useState<BookingItem[]>([]);
 
+  const fetchPendingBookings = async () => {
+    if (!user?.id || !token) return;
+    try {
+      const response = await fetch('http://localhost:8082/api/bookings/pending', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) throw new Error('Failed to fetch pending bookings');
+      const data = await response.json();
+      setPendingBookings(data.data || []);
+    } catch (err) {
+      console.error('Error fetching pending bookings:', err);
+    }
+  };
+
   useEffect(() => {
-    const fetchPendingBookings = async () => {
-      if (!user?.id || !token) return;
-      try {
-        const response = await fetch('http://localhost:8082/api/bookings/pending', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-        if (!response.ok) throw new Error('Failed to fetch pending bookings');
-        const data = await response.json();
-        setPendingBookings(data.data || []);
-      } catch (err) {
-        console.error('Error fetching pending bookings:', err);
-      }
-    };
     fetchPendingBookings();
   }, [user?.id, token]);
 
@@ -64,25 +65,9 @@ export const BookingProvider: React.FC<BookingProviderProps> = ({ children }) =>
         throw new Error('Failed to add to booking: ' + (await response.text()));
       }
 
-      const data = await response.json();
-      setCurrentBooking((prev) => {
-        const existingIndex = prev.findIndex(
-          (booking) => booking.concertId === item.concertId && booking.ticketTypeId === item.ticketTypeId
-        );
+      await response.json();
 
-        if (existingIndex >= 0) {
-          const updated = [...prev];
-          updated[existingIndex] = {
-            ...updated[existingIndex],
-            quantity: updated[existingIndex].quantity + item.quantity,
-            id: data.id,
-            createdAt: data.created_at,
-          };
-          return updated;
-        }
-
-        return [...prev, { ...item, id: data.id, createdAt: data.created_at }];
-      });
+       await fetchPendingBookings();
     } catch (err) {
       console.error('Error adding to booking:', err);
       throw err;
@@ -105,11 +90,7 @@ export const BookingProvider: React.FC<BookingProviderProps> = ({ children }) =>
       if (!response.ok) {
         throw new Error('Failed to remove from booking');
       }
-      setPendingBookings((prev) =>
-        prev.filter(
-          (booking) => !(booking.concert_id === Number(concertId))
-        )
-      );
+      await fetchPendingBookings();
     } catch (err) {
       console.error('Error removing from booking:', err);
       throw err;
